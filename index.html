@@ -147,6 +147,7 @@
 </head>
 <body>
   <header>
+    <div id="pwaControls" style="padding:10px 16px; display:flex; gap:10px; align-items:center; justify-content:flex-end; max-width:760px; margin:0 auto;"> <button id="installBtn" style="display:none;padding:8px 12px;border-radius:8px;border:0;background:#245d88;color:#fff;cursor:pointer;">Install</button> <span id="swStatus" style="font-size:.9rem;color:#566174">SW: unknown</span> <button id="swRegisterBtn" style="padding:6px 10px;border-radius:8px;border:1px solid #d6dce5;background:#fff;cursor:pointer;">Register SW</button> </div>
     <h1>Harbor Hotel</h1>
     <p>Room management</p>
   </header>
@@ -336,4 +337,22 @@
       navigator.serviceWorker.register('./sw.js').catch(console.error);
     });
   }
+  
+/* Service worker registration (attempt on load) */ if ('serviceWorker' in navigator) { window.addEventListener('load', () => { navigator.serviceWorker.register('./sw.js').then(() => { console.log('Service worker registered'); }).catch(err => { console.error('Service worker registration failed:', err); }); }); }
+
+/* PWA UI: beforeinstallprompt + manual register + status */ (() => { const installBtn = document.getElementById('installBtn'); const swStatus = document.getElementById('swStatus'); const swRegisterBtn = document.getElementById('swRegisterBtn');
+
+let deferredPrompt = null; window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); deferredPrompt = e; installBtn.style.display = 'inline-block'; installBtn.textContent = 'Install'; console.log('beforeinstallprompt captured'); });
+
+installBtn.addEventListener('click', async () => { if (!deferredPrompt) return; deferredPrompt.prompt(); const choice = await deferredPrompt.userChoice; console.log('PWA install choice:', choice); if (choice.outcome === 'accepted') installBtn.style.display = 'none'; deferredPrompt = null; });
+
+function setSwStatus(text, ok = true) { swStatus.textContent = 'SW: ' + text; swStatus.style.color = ok ? '#16734a' : '#a53c3c'; }
+
+async function updateSwInfo() { if (!('serviceWorker' in navigator)) { setSwStatus('not supported', false); swRegisterBtn.disabled = true; return; } try { const regs = await navigator.serviceWorker.getRegistrations(); if (regs.length > 0 && navigator.serviceWorker.controller) { setSwStatus('active'); } else if (regs.length > 0) { setSwStatus('registered'); } else { setSwStatus('not registered', false); } } catch (err) { setSwStatus('error', false); console.error(err); } }
+
+swRegisterBtn.addEventListener('click', async () => { if (!('serviceWorker' in navigator)) { setSwStatus('not supported', false); return; } try { setSwStatus('registering...'); const reg = await navigator.serviceWorker.register('./sw.js'); console.log('Service worker registered:', reg); setSwStatus('registered'); } catch (err) { console.error('SW register failed', err); setSwStatus('register failed', false); } });
+
+if ('serviceWorker' in navigator) { navigator.serviceWorker.addEventListener('controllerchange', () => { setTimeout(updateSwInfo, 200); }); }
+
+updateSwInfo(); })();
 </script>
